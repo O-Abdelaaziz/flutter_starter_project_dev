@@ -1,0 +1,51 @@
+┌───────────────────────────────┐
+│         Design Tokens         │
+│───────────────────────────────│
+│ [TColors]   [TTypography]     │
+│ [TSpacing]  [TShadows]        │
+│ [TMotion]   [TRadius]         │
+│ [TBreakpoints] [TOpacity]     │
+│ [TElevation] [TIcons]         │
+│ [TBorders]  [TLayout]         │
+│ [TDurations] [TAnimations]    │
+└───────────────────────────────┘
+                │
+                ▼
+┌────────────────────────────────┐
+│           ThemeData            │
+│────────────────────────────────│
+│ Colors → from TColors          │
+│ Typography → from TTypography  │
+│ Spacing → from TSpacing        │
+│ Shadows → from TShadows        │
+│ Motion → from TMotion          │
+│ Radius → from TRadius          │
+│ Breakpoints → from TBreakpoints│
+│ Opacity → from TOpacity        │
+│ Elevation → from TElevation    │
+│ Icons → from TIcons            │
+│ Borders → from TBorders        │
+│ Layout → from TLayout          │
+│ Durations → from TDurations    │
+│ Animations → from TAnimations  │
+└────────────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────┐
+│         Components            │
+│───────────────────────────────│
+│ Buttons, Cards, Inputs, Chips │
+│ Modals, Tooltips, Snackbars   │
+│ Navigation Bars, Drawers      │
+│ Tables, Lists, Dialogs        │
+└───────────────────────────────┘
+                │
+                ▼
+┌────────────────────────────────┐
+│            Pages               │
+│────────────────────────────────│
+│ Dashboard, Profile, Settings   │
+│ Forms, Reports, Landing Pages  │
+│ Responsive Layouts (mobile →   │
+│ tablet → desktop → widescreen) │
+└────────────────────────────────┘
