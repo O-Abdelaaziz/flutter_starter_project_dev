@@ -1,0 +1,100 @@
+lib/
+│   main.dart                           # Entry point initializing core services & root App
+│
+├── core/                               # Central infrastructure, engines & global configurations
+│   ├── config/                         # Environment variables, app flavors, global constants
+│   │   ├── app_constants.dart          # App-wide string keys, non-sensitive global values
+│   │   └── api_constants.dart          # Base URLs, API versions, endpoint paths
+│   │
+│   ├── errors/                         # App-wide failure & error handling
+│   │   └── exceptions.dart             # Custom exception classes (NetworkException, CacheException)
+│   │
+│   ├── localization/                   # Multi-language & l10n setups
+│   │   └── app_localizations.dart      # Localizations delegate or ARB generated configs
+│   │
+│   ├── network/                        # Low-level network client (merged utils/http & data/network_service)
+│   │   ├── http_client.dart            # Dio/Http wrapper, request methods
+│   │   └── network_exceptions.dart     # HTTP status code interpreters
+│   │
+│   ├── router/                         # Global navigation (merged bindings & routes)
+│   │   ├── app_router.dart             # GoRouter or AutoRoute page route definitions
+│   │   └── app_routes.dart             # Route path constants
+│   │
+│   ├── services/                       # Third-party & platform core services
+│   │   └── crashlytics_service.dart    # Firebase Crashlytics / Sentry initialization
+│   │
+│   ├── storage/                        # Low-level local persistence (merged utils & data/local_storage)
+│   │   ├── storage_constants.dart      # Keys for local storage / secure keys
+│   │   └── local_storage_service.dart  # Shared Preferences / Hive / FlutterSecureStorage client
+│   │
+│   ├── theme/                          # Design tokens and Material ThemeData config
+│   │   ├── design_token_flow.txt
+│   │   ├── theme.dart                  # Light and Dark ThemeData builder
+│   │   ├── theme_widgets/              # Material Component Theme Extensions
+│   │   │   ├── appbar_theme.dart
+│   │   │   ├── button_theme.dart
+│   │   │   ├── card_theme.dart
+│   │   │   ├── chip_theme.dart
+│   │   │   ├── dialog_theme.dart
+│   │   │   ├── input_theme.dart
+│   │   │   ├── listtile_theme.dart
+│   │   │   ├── navbar_theme.dart
+│   │   │   ├── snackbar_theme.dart
+│   │   │   └── tooltip_theme.dart
+│   │   └── tokens/                     # Raw design tokens
+│   │       ├── animations.dart
+│   │       ├── borders.dart
+│   │       ├── breakpoints.dart
+│   │       ├── colors.dart
+│   │       ├── durations.dart
+│   │       ├── elevation.dart
+│   │       ├── icons.dart
+│   │       ├── layout.dart
+│   │       ├── motion.dart
+│   │       ├── opacity.dart
+│   │       ├── radius.dart
+│   │       ├── shadows.dart
+│   │       ├── spacing.dart
+│   │       └── typography.dart
+│   │
+│   └── utils/                          # Pure stateless helpers (no UI/business logic dependencies)
+│       ├── device_utils.dart           # Screen resolution, keyboard visibility, OS checks
+│       ├── formatters.dart             # Currency, date, and phone number formatters
+│       ├── helper_functions.dart       # Pure dart utility functions
+│       ├── logger.dart                 # Console logger configuration
+│       └── validators.dart             # Form validation rules (email, password strength)
+│
+├── common/                             # Shared UI components used across multiple features
+│   ├── layouts/                        # Reusable page wrappers, responsive layouts
+│   └── widgets/                        # Shared design system UI widgets
+│       ├── app_bar/                    # Shared CustomAppBar implementations
+│       ├── buttons/                    # PrimaryButton, SecondaryButton, IconButton
+│       ├── containers/                 # Custom card shells, rounded containers
+│       ├── dialogs/                    # Alert, Confirm, and Loading dialogs
+│       ├── feedback/                   # Snackbars, popups, loaders, shimmer skeletons
+│       ├── icons/                      # Custom app icon wrappers
+│       ├── images/                     # Network image loaders, cache wrappers
+│       └── texts/                      # Styled text primitives (Headings, BodyText)
+│
+└── features/                           # Self-contained modules (Feature-First)
+    └── authentication/                 # Authentication Feature Module
+        ├── data/                       # Data layer specific to auth
+        │   ├── datasources/            # AuthRemoteDataSource, AuthLocalDataSource
+        │   ├── models/                 # UserDTO, AuthTokenModel
+        │   └── repositories/           # AuthRepositoryImpl
+        ├── domain/                     # Optional domain layer (Clean Architecture)
+        │   ├── entities/               # User entity
+        │   └── repositories/           # AuthRepository interface
+        └── presentation/               # UI layer for auth
+            ├── controllers/            # Feature state controllers
+            │   ├── login_controller.dart
+            │   ├── onboarding_controller.dart
+            │   └── register_controller.dart
+            ├── screens/                # Full-page screens
+            │   ├── login_screen.dart
+            │   ├── onboarding_screen.dart
+            │   └── register_screen.dart
+            └── widgets/                # Private widgets used ONLY in Auth screens
+                ├── login_form.dart
+                ├── onboarding_card.dart
+                └── social_auth_buttons.dart
