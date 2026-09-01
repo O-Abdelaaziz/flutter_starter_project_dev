@@ -1,0 +1,42 @@
+In AutoRoute:
+LoginRoute.page is generated automatically by AutoRoute's code generator (build_runner).In AutoRoute, you don't write LoginRoute by hand. Instead, you annotate your screen widget with @RoutePage(), and AutoRoute automatically creates a companion route class with .page in a generated file (auto_route_config.gr.dart).Here is how the complete flow works step-by-step:Step 1: Annotate Your Screen WidgetIn your feature screen (e.g., lib/features/authentication/presentation/screens/login_screen.dart), add the @RoutePage() annotation:Dartimport 'package:auto_route/auto_route.dart';
+import 'package:flutter/material.dart';
+
+@RoutePage() // 👈 Tells AutoRoute to generate a LoginRoute class
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(child: Text('Login Screen')),
+    );
+  }
+}
+Step 2: Run the Code GeneratorOpen your terminal and execute:Bashflutter pub run build_runner build --delete-conflicting-outputs
+This command creates a generated file next to your router config named auto_route_config.gr.dart. Inside that file, AutoRoute automatically generates:Dart// GENERATED CODE - DO NOT MODIFY BY HAND
+class LoginRoute extends PageRouteInfo<void> {
+  const LoginRoute({List<PageRouteInfo>? children})
+      : super(LoginRoute.name, initialChildren: children);
+
+  static const String name = 'LoginRoute';
+  static PageInfo page = PageInfo(name, builder: (data) => const LoginScreen());
+}
+Step 3: Import the Generated File in Your RouterIn your router file (lib/core/router/auto_route_config.dart), add the import pointing to the .gr.dart file:Dartimport 'package:auto_route/auto_route.dart';
+import 'app_routes.dart';
+
+// 👈 This generated import gives you access to LoginRoute, RegisterRoute, etc.
+import 'auto_route_config.gr.dart';
+
+@AutoRouterConfig(replaceInRouteName: 'Page|Screen,Route')
+class AppAutoRouter extends RootStackRouter {
+  @override
+  List<AutoRoute> get routes => [
+        AutoRoute(
+          page: LoginRoute.page, // 👈 Now available from auto_route_config.gr.dart
+          path: AppRoutes.login,
+          initial: true,
+        ),
+      ];
+}
+Summary DifferenceRouterPage Reference SourceRequires Code Gen?GoRouterDirect widget constructor (builder: (context, state) => const LoginScreen())NoAutoRouteGenerated route class (page: LoginRoute.page)Yes (build_runner)
