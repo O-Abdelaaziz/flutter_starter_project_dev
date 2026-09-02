@@ -1,0 +1,379 @@
+Here is the architecture and full implementation for the lib/core/network/ module using Dio, custom interceptors, unified API exception handling, and standard response wrappers.
+
+Folder Structure
+Plaintext
+lib/core/network/
+├── api_client.dart                # Configured Dio HTTP client wrapper
+├── api_endpoints.dart             # API base URLs and endpoint paths
+├── api_exception.dart             # Unified exception hierarchy
+├── api_response.dart              # Standardized API response model
+├── interceptors/
+│   ├── auth_interceptor.dart     # Attaches JWT bearer tokens to requests
+│   ├── error_interceptor.dart    # Converts Dio errors to ApiExceptions
+│   └── logging_interceptor.dart  # Pretty-prints logs in debug mode
+└── network.dart                   # Barrel export file
+Step 1: Add Package Dependencies
+Ensure you have dio in your pubspec.yaml:
+
+YAML
+dependencies:
+  dio: ^5.4.0
+Step 2: Implementation Files
+1. lib/core/network/api_endpoints.dart
+Central repository for base URLs, timeouts, and route endpoints.
+
+Dart
+/// Centralized API endpoint routes and environment configurations.
+abstract final class ApiEndpoints {
+  const ApiEndpoints._();
+
+  // Base Configurations
+  static const String baseUrl = 'https://api.yourdomain.com/v1';
+  static const Duration receiveTimeout = Duration(seconds: 15);
+  static const Duration connectionTimeout = Duration(seconds: 15);
+
+  // Auth Routes
+  static const String login = '/auth/login';
+  static const String register = '/auth/register';
+  static const String refreshToken = '/auth/refresh';
+  static const String logout = '/auth/logout';
+
+  // User Routes
+  static const String profile = '/user/profile';
+}
+2. lib/core/network/api_exception.dart
+A typed exception hierarchy that maps raw network failures, status codes, and server payloads into structured errors.
+
+Dart
+/// Unified network and API exception class.
+class ApiException implements Exception {
+  final String message;
+  final int? statusCode;
+  final String? code;
+  final dynamic data;
+
+  const ApiException({
+    required this.message,
+    this.statusCode,
+    this.code,
+    this.data,
+  });
+
+  factory ApiException.fromDioException(dynamic error) {
+    if (error is! Exception) {
+      return const ApiException(message: 'An unexpected error occurred.');
+    }
+
+    // Handled in ErrorInterceptor via DioException mapping
+    return ApiException(message: error.toString());
+  }
+
+  @override
+  String toString() => 'ApiException(statusCode: $statusCode, code: $code, message: $message)';
+}
+
+/// Specialty exceptions for explicit handling
+class NetworkException extends ApiException {
+  const NetworkException({super.message = 'No internet connection available.'});
+}
+
+class UnauthorizedException extends ApiException {
+  const UnauthorizedException({super.message = 'Unauthorized access. Please log in again.', super.statusCode = 401});
+}
+
+class NotFoundException extends ApiException {
+  const NotFoundException({super.message = 'Requested resource not found.', super.statusCode = 404});
+}
+
+class ServerException extends ApiException {
+  const ServerException({super.message = 'Internal server error. Please try again later.', super.statusCode = 500});
+}
+3. lib/core/network/api_response.dart
+A generic wrapper standardizing backend payloads (data, message, success).
+
+Dart
+/// Generic envelope for API JSON responses.
+class ApiResponse<T> {
+  final bool success;
+  final String? message;
+  final T? data;
+
+  const ApiResponse({
+    required this.success,
+    this.message,
+    this.data,
+  });
+
+  factory ApiResponse.fromJson(
+    Map<String, dynamic> json,
+    T Function(dynamic json) fromJsonT,
+  ) {
+    return ApiResponse<T>(
+      success: json['success'] as bool? ?? true,
+      message: json['message'] as String?,
+      data: json['data'] != null ? fromJsonT(json['data']) : null,
+    );
+  }
+}
+4. Interceptors (lib/core/network/interceptors/)
+auth_interceptor.dart
+Injects Bearer authorization headers into outgoing requests.
+
+Dart
+import 'package:dio/dio.dart';
+
+/// Interceptor that attaches JWT authentication tokens to HTTP requests.
+class AuthInterceptor extends Interceptor {
+  final Future<String?> Function() getToken;
+
+  AuthInterceptor({required this.getToken});
+
+  @override
+  Future<void> onRequest(
+    RequestOptions options,
+    RequestInterceptorHandler handler,
+  ) async {
+    final token = await getToken();
+    if (token != null && token.isNotEmpty) {
+      options.headers['Authorization'] = 'Bearer $token';
+    }
+    handler.next(options);
+  }
+}
+error_interceptor.dart
+Translates low-level DioException types into typed ApiException instances.
+
+Dart
+import 'dart:io';
+import 'package:dio/dio.dart';
+import '../api_exception.dart';
+
+/// Interceptor that converts raw Dio errors into structured [ApiException]s.
+class ErrorInterceptor extends Interceptor {
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final apiException = _mapDioErrorToApiException(err);
+    handler.reject(
+      DioException(
+        requestOptions: err.requestOptions,
+        error: apiException,
+        response: err.response,
+        type: err.type,
+      ),
+    );
+  }
+
+  ApiException _mapDioErrorToApiException(DioException err) {
+    switch (err.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return const ApiException(message: 'Connection timed out. Please try again.');
+
+      case DioExceptionType.badResponse:
+        final statusCode = err.response?.statusCode;
+        final responseData = err.response?.data;
+        String? message;
+
+        if (responseData is Map<String, dynamic>) {
+          message = responseData['message'] as String?;
+        }
+
+        switch (statusCode) {
+          case 401:
+            return UnauthorizedException(message: message ?? 'Session expired. Please log in.');
+          case 404:
+            return NotFoundException(message: message ?? 'Requested resource not found.');
+          case 500:
+          case 502:
+          case 503:
+            return ServerException(message: message ?? 'Server error encountered.');
+          default:
+            return ApiException(
+              message: message ?? 'Received status code $statusCode',
+              statusCode: statusCode,
+              data: responseData,
+            );
+        }
+
+      case DioExceptionType.cancel:
+        return const ApiException(message: 'Request was cancelled.');
+
+      case DioExceptionType.connectionError:
+        if (err.error is SocketException) {
+          return const NetworkException();
+        }
+        return const ApiException(message: 'Failed to establish connection to server.');
+
+      case DioExceptionType.unknown:
+      default:
+        return const ApiException(message: 'An unexpected network error occurred.');
+    }
+  }
+}
+logging_interceptor.dart
+Outputs clean request/response logs during debug builds.
+
+Dart
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
+/// Interceptor for debugging HTTP requests, responses, and errors.
+class LoggingInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (kDebugMode) {
+      debugPrint('--> ${options.method.toUpperCase()} ${options.uri}');
+      debugPrint('Headers: ${options.headers}');
+      if (options.data != null) debugPrint('Body: ${options.data}');
+    }
+    handler.next(options);
+  }
+
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    if (kDebugMode) {
+      debugPrint('<-- ${response.statusCode} ${response.requestOptions.uri}');
+      debugPrint('Response: ${response.data}');
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (kDebugMode) {
+      debugPrint('<-- ERROR ${err.response?.statusCode} ${err.requestOptions.uri}');
+      debugPrint('Error Message: ${err.message}');
+    }
+    handler.next(err);
+  }
+}
+5. lib/core/network/api_client.dart
+The core Dio wrapper providing type-safe GET, POST, PUT, PATCH, and DELETE methods that re-throw clean ApiExceptions.
+
+Dart
+import 'package:dio/dio.dart';
+import 'api_endpoints.dart';
+import 'api_exception.dart';
+import 'interceptors/auth_interceptor.dart';
+import 'interceptors/error_interceptor.dart';
+import 'interceptors/logging_interceptor.dart';
+
+/// Configured HTTP client wrapper utilizing [Dio].
+class ApiClient {
+  late final Dio _dio;
+
+  ApiClient({
+    String? baseUrl,
+    Future<String?> Function()? getToken,
+  }) {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: baseUrl ?? ApiEndpoints.baseUrl,
+        connectTimeout: ApiEndpoints.connectionTimeout,
+        receiveTimeout: ApiEndpoints.receiveTimeout,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    _dio.interceptors.addAll([
+      if (getToken != null) AuthInterceptor(getToken: getToken),
+      ErrorInterceptor(),
+      LoggingInterceptor(),
+    ]);
+  }
+
+  /// Perform a GET request.
+  Future<Response<T>> get<T>(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.get<T>(
+        path,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error as ApiException : ApiException.fromDioException(e);
+    }
+  }
+
+  /// Perform a POST request.
+  Future<Response<T>> post<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.post<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error as ApiException : ApiException.fromDioException(e);
+    }
+  }
+
+  /// Perform a PUT request.
+  Future<Response<T>> put<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.put<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error as ApiException : ApiException.fromDioException(e);
+    }
+  }
+
+  /// Perform a DELETE request.
+  Future<Response<T>> delete<T>(
+    String path, {
+    dynamic data,
+    Map<String, dynamic>? queryParameters,
+    Options? options,
+    CancelToken? cancelToken,
+  }) async {
+    try {
+      return await _dio.delete<T>(
+        path,
+        data: data,
+        queryParameters: queryParameters,
+        options: options,
+        cancelToken: cancelToken,
+      );
+    } on DioException catch (e) {
+      throw e.error is ApiException ? e.error as ApiException : ApiException.fromDioException(e);
+    }
+  }
+}
+6. lib/core/network/network.dart (Barrel Export)
+Dart
+export 'api_client.dart';
+export 'api_endpoints.dart';
+export 'api_exception.dart';
+export 'api_response.dart';
+export 'interceptors/auth_interceptor.dart';
+export 'interceptors/error_interceptor.dart';
+export 'interceptors/logging_interceptor.dart';

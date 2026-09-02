@@ -1,0 +1,104 @@
+Here is the complete implementation for lib/core/di/ using get_it.
+
+This setup provides a central service locator for registering core network clients, secure local storage, repositories, and feature state controllers.
+
+Folder Structure
+Plaintext
+lib/core/di/
+├── injection_container.dart       # Main setup script initializing dependencies
+└── di.dart                        # Barrel export file
+Step 1: Add Package Dependency
+Ensure get_it is declared in your pubspec.yaml:
+
+YAML
+dependencies:
+  get_it: ^7.6.0
+Step 2: Implementation Files
+1. lib/core/di/injection_container.dart
+Dart
+import 'package:get_it/get_it.dart';
+import '../network/api_client.dart';
+
+/// Global access point for the Service Locator instance.
+final sl = GetIt.instance;
+
+/// Central Dependency Injection setup script.
+/// Call [initDependencyInjection] in [main] before [runApp].
+Future<void> initDependencyInjection() async {
+  // ===========================================================================
+  // 1. EXTERNAL & CORE UTILITIES (Singletons)
+  // ===========================================================================
+  
+  // Storage / Local Data Source setup can be registered here:
+  // final sharedPreferences = await SharedPreferences.getInstance();
+  // sl.registerLazySingleton(() => sharedPreferences);
+
+  // ===========================================================================
+  // 2. NETWORK & API CLIENT
+  // ===========================================================================
+  
+  sl.registerLazySingleton<ApiClient>(
+    () => ApiClient(
+      // Retrieve auth tokens lazily from local secure storage when required
+      getToken: () async {
+        // Example: return sl<AuthLocalDataSource>().getAuthToken();
+        return null;
+      },
+    ),
+  );
+
+  // ===========================================================================
+  // 3. FEATURE DATA SOURCES & REPOSITORIES (Lazy Singletons)
+  // ===========================================================================
+  
+  // Example Authentication bindings:
+  // sl.registerLazySingleton<AuthRemoteDataSource>(
+  //   () => AuthRemoteDataSourceImpl(apiClient: sl<ApiClient>()),
+  // );
+  // sl.registerLazySingleton<AuthRepository>(
+  //   () => AuthRepositoryImpl(
+  //     remoteDataSource: sl<AuthRemoteDataSource>(),
+  //     localDataSource: sl<AuthLocalDataSource>(),
+  //   ),
+  // );
+
+  // ===========================================================================
+  // 4. FEATURE CONTROLLERS / BLOCS / CUBITS (Factories)
+  // ===========================================================================
+  
+  // Factories instantiate a fresh object per screen request:
+  // sl.registerFactory(
+  //   () => LoginController(authRepository: sl<AuthRepository>()),
+  // );
+}
+2. lib/core/di/di.dart (Barrel Export)
+Dart
+export 'injection_container.dart';
+Step 3: Usage in main.dart
+To start your application with all dependencies registered, initialize the container inside your entry point:
+
+Dart
+import 'package:flutter/material.dart';
+import 'core/di/di.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize dependency injection service locator
+  await initDependencyInjection();
+
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      home: Scaffold(
+        body: Center(child: Text('App Running with Service Locator')),
+      ),
+    );
+  }
+}

@@ -1,0 +1,305 @@
+Here is an overview of the role and structure of each file within the features/authentication/ feature-first module architecture.
+
+1. Domain Layer (domain/)
+The pure business logic layer. It defines core business entities and contract interfaces without depending on any external frameworks, packages, or API details.
+
+domain/entities/user.dart
+Role: The core business entity representing an authenticated user in the domain layer. Pure Dart with no serialization logic.
+
+Dart
+class User {
+  final String id;
+  final String email;
+  final String fullName;
+  final String? avatarUrl;
+
+  const User({
+    required this.id,
+    required this.email,
+    required this.fullName,
+    this.avatarUrl,
+  });
+}
+domain/repositories/auth_repository.dart
+Role: An abstract interface contract defining the authentication operations available to the presentation layer, separating implementation details from business expectations.
+
+Dart
+import '../entities/user.dart';
+
+abstract interface class AuthRepository {
+  Future<User> login({required String email, required String password});
+  Future<User> register({required String fullName, required String email, required String password});
+  Future<void> logout();
+}
+2. Data Layer (data/)
+Responsible for retrieving raw data from remote APIs or local persistent storage, parsing network responses into DTO models, and implementing domain repository contracts.
+
+data/datasources/auth_remote_data_source.dart
+Role: Handles direct network communication (via HTTP/Dio client) with backend authentication endpoints.
+
+Dart
+import '../models/user_dto.dart';
+
+class AuthRemoteDataSource {
+  Future<UserDTO> login(String email, String password) async {
+    // Executes HTTP POST call to /auth/login and parses JSON response
+    return const UserDTO(id: 'usr_123', email: 'user@example.com', name: 'John Doe');
+  }
+}
+data/datasources/auth_local_data_source.dart
+Role: Manages local persistence for authentication states (e.g., storing JWT tokens securely in encrypted local storage or shared preferences).
+
+Dart
+class AuthLocalDataSource {
+  Future<void> saveAuthToken(String token) async {
+    // Persists access token locally
+  }
+
+  Future<String?> getAuthToken() async {
+    // Reads stored access token
+    return 'jwt_token_sample';
+  }
+}
+data/models/user_dto.dart
+Role: Data Transfer Object (DTO) handling JSON serialization/deserialization. It maps API payloads and extends or converts into the domain User entity.
+
+Dart
+import '../../domain/entities/user.dart';
+
+class UserDTO {
+  final String id;
+  final String email;
+  final String name;
+
+  const UserDTO({required this.id, required this.email, required this.name});
+
+  factory UserDTO.fromJson(Map<String, dynamic> json) {
+    return UserDTO(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: json['full_name'] as String,
+    );
+  }
+
+  User toDomain() => User(id: id, email: email, fullName: name);
+}
+data/models/auth_token_model.dart
+Role: Data model representing JWT token pairs (access and refresh tokens) received during authentication.
+
+Dart
+class AuthTokenModel {
+  final String accessToken;
+  final String refreshToken;
+
+  const AuthTokenModel({required this.accessToken, required this.refreshToken});
+
+  factory AuthTokenModel.fromJson(Map<String, dynamic> json) {
+    return AuthTokenModel(
+      accessToken: json['access_token'] as String,
+      refreshToken: json['refresh_token'] as String,
+    );
+  }
+}
+data/repositories/auth_repository_impl.dart
+Role: Concrete implementation of AuthRepository. Coordinates data flow between remote API data sources and local storage, returning domain entities to callers.
+
+Dart
+import '../../domain/entities/user.dart';
+import '../../domain/repositories/auth_repository.dart';
+import '../datasources/auth_local_data_source.dart';
+import '../datasources/auth_remote_data_source.dart';
+
+class AuthRepositoryImpl implements AuthRepository {
+  final AuthRemoteDataSource remoteDataSource;
+  final AuthLocalDataSource localDataSource;
+
+  AuthRepositoryImpl({required this.remoteDataSource, required this.localDataSource});
+
+  @override
+  Future<User> login({required String email, required String password}) async {
+    final userDto = await remoteDataSource.login(email, password);
+    await localDataSource.saveAuthToken('sample_jwt');
+    return userDto.toDomain();
+  }
+
+  @override
+  Future<User> register({required String fullName, required String email, required String password}) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> logout() async {}
+}
+3. Presentation Layer (presentation/)
+The user interface layer. Contains state management controllers, full screens, and feature-private UI widgets.
+
+presentation/controllers/login_controller.dart
+Role: Manages UI state, input validation, and business logic execution for the Login Screen (e.g., BLoC, Cubit, ChangeNotifier, or Riverpod controller).
+
+Dart
+import 'package:flutter/foundation.dart';
+import '../../domain/repositories/auth_repository.dart';
+
+class LoginController extends ChangeNotifier {
+  final AuthRepository authRepository;
+
+  LoginController({required this.authRepository});
+
+  bool isLoading = false;
+  String? errorMessage;
+
+  Future<void> login(String email, String password) async {
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      await authRepository.login(email: email, password: password);
+    } catch (e) {
+      errorMessage = e.toString();
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+}
+presentation/controllers/register_controller.dart
+Role: Handles state management and input processing specifically for new account registrations.
+
+Dart
+import 'package:flutter/foundation.dart';
+
+class RegisterController extends ChangeNotifier {
+  bool isLoading = false;
+  // Registration state handling logic
+}
+presentation/controllers/onboarding_controller.dart
+Role: Controls carousel slide indexes and completion flags for the onboarding walkthrough sequence.
+
+Dart
+import 'package:flutter/foundation.dart';
+
+class OnboardingController extends ChangeNotifier {
+  int currentIndex = 0;
+
+  void onPageChanged(int index) {
+    currentIndex = index;
+    notifyListeners();
+  }
+}
+presentation/screens/login_screen.dart
+Role: Full-page scaffold for logging in. Combines AppScaffold, CustomAppBar, and feature-private widgets like LoginForm.
+
+Dart
+import 'package:flutter/material.dart';
+import '../../../../common/layouts/app_scaffold.dart';
+import '../widgets/login_form.dart';
+
+class LoginScreen extends StatelessWidget {
+  const LoginScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppScaffold(
+      useSafeArea: true,
+      body: Center(child: LoginForm()),
+    );
+  }
+}
+presentation/screens/register_screen.dart
+Role: Full-page layout hosting the registration form and account creation workflow.
+
+Dart
+import 'package:flutter/material.dart';
+import '../../../../common/layouts/app_scaffold.dart';
+
+class RegisterScreen extends StatelessWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppScaffold(
+      body: Center(child: Text('Register Screen')),
+    );
+  }
+}
+presentation/screens/onboarding_screen.dart
+Role: Walkthrough page presented to first-time app users before reaching authentication or main dashboards.
+
+Dart
+import 'package:flutter/material.dart';
+import '../../../../common/layouts/app_scaffold.dart';
+
+class OnboardingScreen extends StatelessWidget {
+  const OnboardingScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const AppScaffold(
+      body: Center(child: Text('Onboarding Carousel')),
+    );
+  }
+}
+presentation/widgets/login_form.dart
+Role: Private form component used exclusively inside LoginScreen to handle text fields and submit action buttons.
+
+Dart
+import 'package:flutter/material.dart';
+import '../../../../common/widgets/buttons/primary_button.dart';
+
+class LoginForm extends StatelessWidget {
+  const LoginForm({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const TextField(decoration: InputDecoration(labelText: 'Email')),
+        const TextField(decoration: InputDecoration(labelText: 'Password')),
+        PrimaryButton(text: 'Log In', onPressed: () {}),
+      ],
+    );
+  }
+}
+presentation/widgets/onboarding_card.dart
+Role: Private card component used exclusively inside OnboardingScreen to render individual step pages (illustration, title, subtitle).
+
+Dart
+import 'package:flutter/material.dart';
+
+class OnboardingCard extends StatelessWidget {
+  final String title;
+  final String description;
+
+  const OnboardingCard({super.key, required this.title, required this.description});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(title, style: Theme.of(context).textTheme.headlineMedium),
+        Text(description),
+      ],
+    );
+  }
+}
+presentation/widgets/social_auth_buttons.dart
+Role: Private component rendering Google, Apple, or social single sign-on (SSO) action buttons on authentication screens.
+
+Dart
+import 'package:flutter/material.dart';
+import '../../../../common/widgets/buttons/secondary_button.dart';
+
+class SocialAuthButtons extends StatelessWidget {
+  const SocialAuthButtons({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SecondaryButton(text: 'Continue with Google', onPressed: () {}),
+        SecondaryButton(text: 'Continue with Apple', onPressed: () {}),
+      ],
+    );
+  }
+}
