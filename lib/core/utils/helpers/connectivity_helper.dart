@@ -14,8 +14,8 @@ enum NetworkStatus {
 }
 
 /// Utility class for inspecting real-time device network interface connectivity.
-abstract final class ConnectivityUtils {
-  const ConnectivityUtils._();
+abstract final class ConnectivityHelper {
+  const ConnectivityHelper._();
 
   static final Connectivity _connectivity = Connectivity();
 
@@ -24,7 +24,7 @@ abstract final class ConnectivityUtils {
   // ===========================================================================
 
   /// Returns the current primary active network connection status.
-  /// Example: `final status = await ConnectivityUtils.checkConnectivity();`
+  /// Example: `final status = await ConnectivityHelper.checkConnectivity();`
   static Future<NetworkStatus> checkConnectivity() async {
     final results = await _connectivity.checkConnectivity();
     return _mapResultsToStatus(results);
@@ -57,7 +57,7 @@ abstract final class ConnectivityUtils {
   ///
   /// Example Usage:
   /// ```dart
-  /// ConnectivityUtils.onStatusChanged.listen((status) {
+  /// ConnectivityHelper.onStatusChanged.listen((status) {
   ///   if (status.isDisconnected) {
   ///     showOfflineBanner();
   ///   }
